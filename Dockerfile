@@ -1,16 +1,26 @@
-# To compile this image manually run:
-#
-# $ GO111MODULE=on GOOS=linux GOARCH=amd64 go build && docker build -t oryd/hydra:v1.0.0-rc.7_oryOS.10 . && rm hydra
-FROM alpine:3.11
+FROM golang:1.13.5-alpine
 
-RUN apk add -U --no-cache ca-certificates
+RUN apk add --no-cache git ca-certificates
+
+ENV GO111MODULE=on
+
+WORKDIR /hydra
+
+COPY go.mod .
+COPY go.sum .
+
+RUN go mod download
+
+COPY . .
+
+RUN go mod verify
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o hydra
 
 FROM scratch
 
 COPY --from=0 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY hydra /usr/bin/hydra
-
-USER 1000
+COPY --from=0 /hydra/hydra /usr/bin/hydra
 
 ENTRYPOINT ["hydra"]
+
 CMD ["serve", "all"]
